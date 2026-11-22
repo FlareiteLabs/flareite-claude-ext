@@ -1,0 +1,211 @@
+# Claude Code: a chat with Claude Code, Anthropic's coding agent, in a tab
+# beside the editor. The extension runs the `claude` command-line program the
+# user installed, speaking its JSON stream protocol on the program's input
+# and output (spawn-interactive, API 2.1), and shows the conversation in a
+# webview pane. Claude asks before it edits a file or runs a command; edits
+# show as diffs, in the chat and in a diff tab. See the README.
+id = "flareite.claude-code"
+name = "Claude Code"
+version = "1.0.0"
+description = "Chat with Claude Code, Anthropic's coding agent, beside the editor."
+author = "Flareite"
+icon = "icon.svg"
+api_version = "2"
+entrypoint = "target/wasm32-unknown-unknown/release/claude_code.wasm"
+events = ["active-file-changed", "selection-changed", "folder-changed", "configuration-changed"]
+
+[engines]
+flareite = ">=0.1.0"
+
+[build]
+command = "cargo"
+args = ["build", "--release"]
+watch = ["src", "Cargo.toml"]
+
+[permissions]
+# Running the `claude` program, in the chat and in terminals.
+processes = true
+# Showing Claude's proposed edits against the files as they are, and listing
+# files for @-mentions.
+files_read = true
+# The selection and the problems in the file in use, sent along when asked.
+documents_read = true
+
+[[programs]]
+name = "claude"
+
+# --- Commands -------------------------------------------------------------
+
+[[commands]]
+id = "flareite.claude-code.open"
+title = "Open Claude Code"
+category = "Claude Code"
+
+[[commands]]
+id = "flareite.claude-code.newChat"
+title = "New Chat"
+category = "Claude Code"
+
+[[commands]]
+id = "flareite.claude-code.addSelection"
+title = "Add Selection to Chat"
+category = "Claude Code"
+
+[[commands]]
+id = "flareite.claude-code.addFile"
+title = "Add to Chat"
+category = "Claude Code"
+
+[[commands]]
+id = "flareite.claude-code.fixProblems"
+title = "Fix Problems in This File"
+category = "Claude Code"
+
+[[commands]]
+id = "flareite.claude-code.resume"
+title = "Resume a Past Chat…"
+category = "Claude Code"
+
+[[commands]]
+id = "flareite.claude-code.runInTerminal"
+title = "Run Claude in a Terminal"
+category = "Claude Code"
+
+[[commands]]
+id = "flareite.claude-code.signIn"
+title = "Sign In"
+category = "Claude Code"
+
+[[commands]]
+id = "flareite.claude-code.setApiKey"
+title = "Use an Anthropic API Key…"
+category = "Claude Code"
+
+[[commands]]
+id = "flareite.claude-code.clearApiKey"
+title = "Forget the Anthropic API Key"
+category = "Claude Code"
+
+# The buttons of a proposed edit's diff tab.
+[[commands]]
+id = "flareite.claude-code.acceptEdit"
+title = "Accept Edit"
+hidden = true
+
+[[commands]]
+id = "flareite.claude-code.acceptAllEdits"
+title = "Accept Edits for This Chat"
+hidden = true
+
+[[commands]]
+id = "flareite.claude-code.rejectEdit"
+title = "Reject Edit"
+hidden = true
+
+[[keybindings]]
+command = "flareite.claude-code.open"
+key = "ctrl+escape"
+mac = "mod+escape"
+
+[[keybindings]]
+command = "flareite.claude-code.newChat"
+key = "ctrl+shift+escape"
+mac = "mod+shift+escape"
+
+[[keybindings]]
+command = "flareite.claude-code.addSelection"
+key = "ctrl+alt+k"
+mac = "mod+alt+k"
+when = "editorFocus"
+
+[[menus]]
+location = "editor/context"
+command = "flareite.claude-code.addSelection"
+group = "claude"
+
+[[menus]]
+location = "editor/context"
+command = "flareite.claude-code.fixProblems"
+group = "claude"
+
+[[menus]]
+location = "explorer/context"
+command = "flareite.claude-code.addFile"
+group = "claude"
+targets = ["files", "folders"]
+
+[[status_items]]
+id = "claude"
+alignment = "right"
+priority = 100
+text = "✻ Claude"
+tooltip = "Open Claude Code (Ctrl+Esc)"
+command = "flareite.claude-code.open"
+
+# --- Tabs -----------------------------------------------------------------
+
+# A chat: the conversation, in a page of the extension's.
+[[layouts]]
+id = "chat"
+title = "Claude Code"
+
+# A proposed edit: the file as it is beside the file as Claude would leave it.
+[[layouts]]
+id = "edit"
+title = "Proposed Edit"
+
+# The two sides of a proposed edit (`claude-code:<edit>/<side>/<file name>`).
+[[text_providers]]
+scheme = "claude-code"
+
+[decorations.inserted-line]
+background = "diff-inserted-line"
+whole_line = true
+
+[decorations.removed-line]
+background = "diff-removed-line"
+whole_line = true
+
+[decorations.inserted-text]
+background = "diff-inserted-text"
+
+[decorations.removed-text]
+background = "diff-removed-text"
+
+[decorations.ruler-inserted]
+border = "editor-gutter-added"
+
+[decorations.ruler-removed]
+border = "editor-gutter-removed"
+
+[decorations.ruler-changed]
+border = "editor-gutter-modified"
+
+# --- Settings ---------------------------------------------------------------
+
+[configuration.model]
+type = "string"
+default = ""
+description = "The model new chats start with, such as \"sonnet\" or \"opus\"; empty for Claude Code's default. The chat's model menu changes it for one chat."
+
+[configuration.permission_mode]
+type = "string"
+default = "default"
+choices = ["default", "acceptEdits", "plan"]
+description = "How new chats start: asking before edits (default), editing without asking (acceptEdits), or planning without editing (plan). Commands always ask."
+
+[configuration.effort]
+type = "string"
+default = ""
+choices = ["", "low", "medium", "high", "xhigh", "max"]
+description = "How much effort Claude puts into its answers in new chats; empty for Claude Code's default."
+
+[configuration.include_editor_context]
+type = "boolean"
+default = true
+description = "Whether the chat starts out sending the file in use and its selection along with each message (a button in the chat turns it off for a message)."
+
+[configuration.open_beside]
+type = "boolean"
+default = true
+description = "Whether chats open beside the editor rather than in its group."

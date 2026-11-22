@@ -1,0 +1,23 @@
+[package]
+name = "claude-code"
+description = "Claude Code for Flareite: a chat with Claude Code, Anthropic's coding agent, beside the editor."
+version = "1.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The editor's repository, checked out beside this one.
+flareite-extension-api = { path = "../editor/crates/flareite-extension-api" }
+flareite-diff = { path = "../editor/crates/flareite-diff" }
+pulldown-cmark = { version = "0.13.0", default-features = false, features = ["html"] }
+serde_json = "1.0.145"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

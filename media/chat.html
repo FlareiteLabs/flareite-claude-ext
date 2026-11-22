@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Claude Code</title>
+    <link rel="stylesheet" href="__flareite/kit.css" />
+    <link rel="stylesheet" href="chat.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <span class="bar__title" id="title">Claude Code</span>
+      <span class="bar__account" id="account"></span>
+      <span class="spacer"></span>
+      <button
+        class="flareite-button"
+        id="history"
+        type="button"
+        title="Past chats"
+        aria-label="Past chats"
+      >
+        <span class="flareite-icon" data-icon="list-flat"></span>
+      </button>
+      <button class="flareite-button" id="new" type="button" title="New chat" aria-label="New chat">
+        <span class="flareite-icon" data-icon="add"></span>
+      </button>
+    </header>
+
+    <div class="problem" id="problem" role="alert" hidden></div>
+
+    <main class="transcript" id="transcript" aria-live="polite">
+      <div class="empty" id="empty">
+        <div class="empty__mark" aria-hidden="true">✻</div>
+        <p>Ask Claude Code to explain, fix, or build something in this folder.</p>
+        <p class="muted">
+          Type <kbd>@</kbd> to mention a file and <kbd>/</kbd> for commands. Claude asks before it
+          edits a file or runs a command.
+        </p>
+      </div>
+    </main>
+
+    <section class="history" id="historyPanel" hidden aria-label="Past chats">
+      <div class="history__head">
+        <strong>Past chats</strong>
+        <span class="spacer"></span>
+        <button class="flareite-button" id="historyClose" type="button" aria-label="Close">
+          <span class="flareite-icon" data-icon="close"></span>
+        </button>
+      </div>
+      <ul class="history__list" id="historyList"></ul>
+    </section>
+
+    <footer class="composer">
+      <div class="popup" id="popup" role="listbox" hidden></div>
+      <div class="chips">
+        <button
+          class="chip"
+          id="context"
+          type="button"
+          aria-pressed="true"
+          hidden
+          title="Send the file in use and its selection along with the message"
+        ></button>
+        <button
+          class="chip"
+          id="problems"
+          type="button"
+          title="Ask Claude to fix the problems in the file in use"
+        >
+          Problems
+        </button>
+      </div>
+      <textarea
+        class="composer__input"
+        id="input"
+        rows="3"
+        placeholder="Ask Claude Code… (@ for files, / for commands)"
+        aria-label="Message"
+      ></textarea>
+      <div class="composer__controls">
+        <select
+          class="flareite-input select"
+          id="mode"
+          aria-label="Permission mode"
+          title="How Claude asks before acting"
+        >
+          <option value="default">Ask before edits</option>
+          <option value="acceptEdits">Edit automatically</option>
+          <option value="plan">Plan mode</option>
+        </select>
+        <select class="flareite-input select" id="model" aria-label="Model" title="Model"></select>
+        <span class="spacer"></span>
+        <span class="busy" id="busy" hidden
+          ><span class="spinner" aria-hidden="true"></span>Working…</span
+        >
+        <button class="flareite-button flareite-primary send" id="send" type="button">Send</button>
+      </div>
+    </footer>
+
+    <div class="toast" id="toast" role="status" hidden></div>
+    <script src="chat.js"></script>
+  </body>
+</html>
