@@ -3,8 +3,8 @@
 //!
 //! The program runs with `--print --input-format stream-json
 //! --output-format stream-json`. Into it go the user's messages and control
-//! requests (`initialize`, `interrupt`, `set_model`, `set_permission_mode`),
-//! and the answers to its own control requests: with
+//! requests (`initialize`, `interrupt`, `set_model`, `set_permission_mode`,
+//! `apply_flag_settings` for the effort level, `get_settings`), and the answers to its own control requests: with
 //! `--permission-prompt-tool stdio`, before it uses a tool that needs the
 //! user's permission it asks with a `can_use_tool` request, which the
 //! extension answers `allow` (possibly with changed input, and permission
@@ -103,6 +103,18 @@ pub fn set_model(model: &str) -> Value {
 
 pub fn set_permission_mode(mode: &str) -> Value {
   json!({ "subtype": "set_permission_mode", "mode": mode })
+}
+
+/// Changes the effort level for the rest of the session; `None` goes back to
+/// the model's default (or the user's Claude Code settings).
+pub fn set_effort(level: Option<&str>) -> Value {
+  json!({ "subtype": "apply_flag_settings", "settings": { "effortLevel": level } })
+}
+
+/// Asks for the settings in effect; the answer's `applied.effort` is the
+/// effort level the next turn uses.
+pub fn get_settings() -> Value {
+  json!({ "subtype": "get_settings" })
 }
 
 /// How the user answered a `can_use_tool` request.

@@ -97,6 +97,11 @@ pub struct Chat {
   /// The model and permission mode chosen in the chat, if any.
   pub model: Option<String>,
   pub mode: Option<String>,
+  /// The effort level chosen (`low` to `max`); `None` for the default.
+  pub effort: Option<String>,
+  /// The effort level the program says it uses, read after it starts and
+  /// whenever the model or level changes.
+  applied_effort: Option<String>,
   /// Whether an Anthropic API key is used (costs are then shown).
   pub api_key: bool,
   /// The editor context the page shows: `{ label, enabled }`.
@@ -146,6 +151,8 @@ impl Chat {
       problem: None,
       model: None,
       mode: None,
+      effort: None,
+      applied_effort: None,
       api_key: false,
       context: json!({ "label": null, "enabled": true }),
       stopping: false,
@@ -327,6 +334,12 @@ impl Chat {
               "value": text(model, "value")?,
               "label": text(model, "displayName").unwrap_or(text(model, "value")?),
               "description": text(model, "description").unwrap_or_default(),
+              // The levels it takes; none when it has no effort setting.
+              "efforts": model
+                .get("supportedEffortLevels")
+                .filter(|_| model["supportsEffort"].as_bool() == Some(true))
+                .cloned()
+                .unwrap_or_else(|| json!([])),
             }))
           })
           .collect()
@@ -369,6 +382,8 @@ impl Chat {
       "models": models,
       "model": self.model.clone().unwrap_or_else(|| "default".into()),
       "mode": mode,
+      "effort": self.effort.clone().unwrap_or_default(),
+      "appliedEffort": self.applied_effort,
       "account": account,
       "title": self.title,
       "commands": commands,
@@ -460,6 +475,32 @@ impl Chat {
       ));
     }
     self.post_status();
+  }
+
+  /// Sets the effort level: `low` to `max`, or empty for the default. It
+  /// applies from the next turn on.
+  pub fn set_effort(&mut self, level: &str) {
+    let level = level.trim();
+    self.effort = (!level.is_empty() && level != "default").then(|| level.to_owned());
+    if self.process.is_some() {
+      let id = self.request_id("effort");
+      self.outbox.input.extend(protocol::control_request(
+        &id,
+        protocol::set_effort(self.effort.as_deref()),
+      ));
+    }
+    self.post_status();
+  }
+
+  /// Asks the program which effort level it uses now.
+  fn read_settings(&mut self) {
+    if self.process.is_some() {
+      let id = self.request_id("settings");
+      self
+        .outbox
+        .input
+        .extend(protocol::control_request(&id, protocol::get_settings()));
+    }
   }
 
   /// Lines the program wrote.
@@ -592,6 +633,15 @@ impl Chat {
           &format!("The mode couldn't be changed: {error}"),
           &[],
         );
+      } else if id.starts_with("effort") {
+        self.note(
+          "error",
+          &format!("The effort level couldn't be changed: {error}"),
+          &[],
+        );
+        self.read_settings();
+      } else if id.starts_with("settings") {
+        // An older Claude Code: the default level just isn't shown.
       } else if !id.starts_with("interrupt") {
         self.note("error", &format!("Claude Code: {error}"), &[]);
       }
@@ -600,6 +650,15 @@ impl Chat {
     if id.starts_with("init") {
       self.init = Some(response["response"].clone());
       self.post_status();
+      self.read_settings();
+    } else if id.starts_with("model") || id.starts_with("effort") {
+      self.read_settings();
+    } else if id.starts_with("settings") {
+      let applied = text(&response["response"]["applied"], "effort").map(str::to_owned);
+      if applied != self.applied_effort {
+        self.applied_effort = applied;
+        self.post_status();
+      }
     }
   }
 
