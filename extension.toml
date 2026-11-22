@@ -6,7 +6,7 @@
 # show as diffs, in the chat and in a diff tab. See the README.
 id = "flareite.claude-code"
 name = "Claude Code"
-version = "1.1.0"
+version = "1.2.0"
 description = "Chat with Claude Code, Anthropic's coding agent, beside the editor."
 author = "Flareite"
 icon = "icon.svg"
@@ -191,19 +191,24 @@ border = "editor-gutter-modified"
 [configuration.model]
 type = "string"
 default = ""
-description = "The model new chats start with, such as \"sonnet\" or \"opus\"; empty for Claude Code's default. The chat's model menu changes it for one chat."
+description = "The model new chats start with, such as \"sonnet\" or \"opus\"; empty for Claude Code's default. Choosing one in a chat's model menu changes it."
 
 [configuration.permission_mode]
 type = "string"
 default = "default"
-choices = ["default", "acceptEdits", "plan"]
-description = "How new chats start: asking before edits (default), editing without asking (acceptEdits), or planning without editing (plan). Commands always ask."
+choices = ["default", "acceptEdits", "plan", "auto", "bypassPermissions"]
+description = "How new chats start: asking before edits (default), editing without asking (acceptEdits), planning without editing (plan), Claude Code deciding what's safe to do without asking (auto), or never asking (bypassPermissions, which needs allow_bypass_permissions). Choosing one in a chat's mode menu changes it."
+
+[configuration.allow_bypass_permissions]
+type = "boolean"
+default = false
+description = "Whether the mode menu's Bypass permissions can be used: Claude then runs any command and changes any file without asking, and its commands can reach beyond the folder. Flareite asks before turning it on."
 
 [configuration.effort]
 type = "string"
 default = ""
 choices = ["", "low", "medium", "high", "xhigh", "max"]
-description = "The effort level new chats start with (the chat's effort menu changes it); empty for Claude Code's default."
+description = "The effort level new chats start with; empty for Claude Code's default. Choosing one in a chat's effort menu changes it."
 
 [configuration.include_editor_context]
 type = "boolean"

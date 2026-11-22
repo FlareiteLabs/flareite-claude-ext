@@ -27,6 +27,8 @@ pub struct Start {
   pub effort: Option<String>,
   /// A session to continue.
   pub resume: Option<String>,
+  /// The user allowed Bypass permissions: the chat can switch to it.
+  pub allow_bypass: bool,
 }
 
 /// The program's arguments for a chat.
@@ -58,6 +60,9 @@ pub fn arguments(start: &Start) -> Vec<String> {
   option("--permission-mode", &start.mode);
   option("--effort", &start.effort);
   option("--resume", &start.resume);
+  if start.allow_bypass {
+    args.push("--allow-dangerously-skip-permissions".to_owned());
+  }
   args
 }
 
@@ -221,6 +226,7 @@ mod tests {
       mode: Some(" ".into()),
       effort: None,
       resume: Some("abc".into()),
+      allow_bypass: false,
     };
     let args = arguments(&start);
     let after = |flag: &str| {
@@ -232,6 +238,12 @@ mod tests {
     assert_eq!(after("--model"), Some("sonnet"));
     assert_eq!(after("--resume"), Some("abc"));
     assert_eq!(after("--permission-mode"), None, "blank");
+    assert!(!args.contains(&"--allow-dangerously-skip-permissions".to_owned()));
+    let allowed = arguments(&Start {
+      allow_bypass: true,
+      ..Start::default()
+    });
+    assert!(allowed.contains(&"--allow-dangerously-skip-permissions".to_owned()));
   }
 
   #[test]

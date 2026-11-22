@@ -102,6 +102,10 @@ pub struct Chat {
   /// The effort level the program says it uses, read after it starts and
   /// whenever the model or level changes.
   applied_effort: Option<String>,
+  /// The program was started able to switch to Bypass permissions.
+  pub bypass_allowed: bool,
+  /// Restart the program once the turn ends (to allow Bypass permissions).
+  pub restart_after_turn: bool,
   /// Whether an Anthropic API key is used (costs are then shown).
   pub api_key: bool,
   /// The editor context the page shows: `{ label, enabled }`.
@@ -153,6 +157,8 @@ impl Chat {
       mode: None,
       effort: None,
       applied_effort: None,
+      bypass_allowed: false,
+      restart_after_turn: false,
       api_key: false,
       context: json!({ "label": null, "enabled": true }),
       stopping: false,
@@ -340,6 +346,7 @@ impl Chat {
                 .filter(|_| model["supportsEffort"].as_bool() == Some(true))
                 .cloned()
                 .unwrap_or_else(|| json!([])),
+              "auto": model["supportsAutoMode"].as_bool() == Some(true),
             }))
           })
           .collect()

@@ -357,16 +357,50 @@ function setStatus(next) {
   }
   model.value = next.model
   setEffort(next, models)
+  setModes(next, models)
+  $('busy').hidden = !next.busy
+  setContext(next.context)
+  updateSend()
+}
+
+/** The permission modes: value, label, and what it does. */
+const MODES = [
+  ['default', 'Ask before edits', 'Claude asks before it changes a file or runs a command'],
+  ['acceptEdits', 'Edit automatically', 'Claude changes files without asking; commands still ask'],
+  [
+    'plan',
+    'Plan mode',
+    'Claude plans without changing anything, then asks you to approve the plan',
+  ],
+  ['auto', 'Auto mode', 'Claude Code decides which actions are safe to take without asking'],
+  [
+    'bypassPermissions',
+    'Bypass permissions',
+    'Claude runs commands and changes files without asking (asks you to allow it the first time)',
+  ],
+]
+
+/** The mode menu; Auto mode only for models that have it. */
+function setModes(next, models) {
   const mode = $('mode')
-  if (![...mode.options].some(option => option.value === next.mode)) {
+  const current = models.find(choice => choice.value === next.model) || models[0]
+  const auto = Boolean(current && current.auto)
+  mode.replaceChildren()
+  for (const [value, label, title] of MODES) {
+    if (value === 'auto' && !auto && next.mode !== 'auto') continue
+    const option = el('option', '', label)
+    option.value = value
+    option.title = title
+    mode.append(option)
+  }
+  if (!MODES.some(([value]) => value === next.mode)) {
     const option = el('option', '', next.mode)
     option.value = next.mode
     mode.append(option)
   }
   mode.value = next.mode
-  $('busy').hidden = !next.busy
-  setContext(next.context)
-  updateSend()
+  const chosen = MODES.find(([value]) => value === next.mode)
+  mode.title = chosen ? chosen[2] : 'How Claude asks before acting'
 }
 
 const EFFORT_NAMES = {

@@ -29,7 +29,7 @@ use flareite_extension_api::layouts::{
   PaneMessage,
 };
 use flareite_extension_api::processes::{self, ProcessError, ProcessOptions};
-use flareite_extension_api::prompts::{self, AnswerValue, InputOptions, PickItem};
+use flareite_extension_api::prompts::{self, AnswerValue, ConfirmOptions, InputOptions, PickItem};
 use flareite_extension_api::terminals::{self, TerminalOptions};
 use flareite_extension_api::types::{
   Activation, CommandContext, ConfigValue, LogLevel, MessageLevel, Position, Range, Severity,
@@ -55,6 +55,11 @@ const MAX_SELECTION_BYTES: usize = 32 * 1024;
 /// Most problems put in a message.
 const MAX_PROBLEMS: usize = 50;
 
+/// The permission mode that never asks.
+const BYPASS: &str = "bypassPermissions";
+/// The setting that lets chats use it.
+const ALLOW_BYPASS: &str = "allow_bypass_permissions";
+
 fn log(level: LogLevel, message: &str) {
   host::log(level, message);
 }
@@ -74,6 +79,18 @@ fn flag(key: &str, default: bool) -> bool {
   match host::configuration(key) {
     Some(ConfigValue::Boolean(value)) => value,
     _ => default,
+  }
+}
+
+/// Saves a choice from a chat's menus as the setting new chats start with;
+/// `None` goes back to the setting's default.
+fn remember(key: &str, value: Option<&str>) {
+  if setting(key).as_deref() == value {
+    return;
+  }
+  let value = value.map(|value| ConfigValue::Text(value.to_owned()));
+  if let Err(problem) = host::set_configuration(key, value.as_ref()) {
+    log(LogLevel::Warn, &format!("couldn't save {key}: {problem:?}"));
   }
 }
 
@@ -114,6 +131,8 @@ impl chat::Files for EditorFiles {
 /// What a prompt the extension showed is for.
 enum Asked {
   ApiKey,
+  /// Whether to allow Bypass permissions, chosen in this chat.
+  Bypass(String),
   /// A past chat to resume, in a new tab.
   Resume,
 }
@@ -284,6 +303,12 @@ impl Extension for ClaudeCode {
             self.restart_idle_chats();
           }
           (Asked::Resume, AnswerValue::Picked(session)) => self.resume_in_new_tab(&session),
+          (Asked::Bypass(key), AnswerValue::Button(0)) => {
+            host::set_configuration(ALLOW_BYPASS, Some(&ConfigValue::Boolean(true)))
+              .map_err(|error| format!("{error:?}"))?;
+            self.set_mode(&key, BYPASS);
+            self.after(&key);
+          }
           _ => {}
         }
       }
@@ -350,6 +375,9 @@ impl ClaudeCode {
     let mut chat = Chat::new(key);
     chat.root = root();
     chat.api_key = matches!(secrets::get(API_KEY), Ok(Some(_)));
+    // The menus start where they were left.
+    chat.model = setting("model");
+    chat.mode = setting("permission_mode");
     chat.effort = setting("effort");
     chat.context = self.context_status();
     chat
@@ -490,6 +518,15 @@ impl ClaudeCode {
     if retitle {
       self.set_chat_layout(key);
     }
+    // Bypass permissions was chosen during the turn.
+    if outbox.turn_ended
+      && self
+        .chats
+        .get(key)
+        .is_some_and(|chat| chat.restart_after_turn)
+    {
+      self.restart(key);
+    }
     self.update_status_item();
   }
 
@@ -524,15 +561,18 @@ impl ClaudeCode {
     }
     let api_key = secrets::get(API_KEY).ok().flatten();
     chat.api_key = api_key.is_some();
+    let allow_bypass = flag(ALLOW_BYPASS, false);
+    if !allow_bypass && chat.mode.as_deref() == Some(BYPASS) {
+      chat.mode = None;
+    }
+    chat.bypass_allowed = allow_bypass;
+    chat.restart_after_turn = false;
     let start = protocol::Start {
-      model: chat
-        .model
-        .clone()
-        .filter(|model| model != "default")
-        .or_else(|| setting("model")),
-      mode: chat.mode.clone().or_else(|| setting("permission_mode")),
+      model: chat.model.clone().filter(|model| model != "default"),
+      mode: chat.mode.clone(),
       effort: chat.effort.clone(),
       resume: chat.session.clone(),
+      allow_bypass,
     };
     let mut env = Vec::new();
     if let Some(api_key) = api_key {
@@ -593,6 +633,62 @@ impl ClaudeCode {
       chat.ended(None, None);
     }
     self.start(key);
+  }
+
+  /// The user chose a permission mode in a chat's menu. Bypass permissions
+  /// asks first, the first time.
+  fn choose_mode(&mut self, key: &str, mode: &str) {
+    if mode == BYPASS && !flag(ALLOW_BYPASS, false) {
+      // The menu shows the mode in use until the user agrees.
+      if let Some(chat) = self.chats.get_mut(key) {
+        chat.post_status();
+      }
+      match prompts::confirm(&ConfirmOptions {
+        message: "Let Claude Code run commands and change files without asking?".into(),
+        detail: Some(
+          "In Bypass permissions mode, Claude doesn't ask before it runs a command or changes a file. Its commands aren't limited to this folder: they can do anything you can on this computer, such as deleting files or using the internet. Choose another mode in the menu to make it ask again.".into(),
+        ),
+        buttons: vec!["Allow Bypass Permissions".into()],
+        destructive: true,
+      }) {
+        Ok(prompt) => {
+          self.prompts.insert(prompt, Asked::Bypass(key.to_owned()));
+        }
+        Err(problem) => log(
+          LogLevel::Warn,
+          &format!("couldn't ask about Bypass permissions: {problem:?}"),
+        ),
+      }
+      return;
+    }
+    self.set_mode(key, mode);
+  }
+
+  fn set_mode(&mut self, key: &str, mode: &str) {
+    remember(
+      "permission_mode",
+      Some(mode).filter(|mode| *mode != "default"),
+    );
+    let Some(chat) = self.chats.get_mut(key) else {
+      return;
+    };
+    if mode != BYPASS || chat.process.is_none() || chat.bypass_allowed {
+      chat.set_mode(mode);
+      return;
+    }
+    // The program has to start again, able to bypass, continuing the session.
+    chat.mode = Some(mode.to_owned());
+    if chat.busy {
+      chat.restart_after_turn = true;
+      chat.note(
+        "info",
+        "Bypass permissions starts when Claude finishes this turn.",
+        &[],
+      );
+      chat.post_status();
+    } else {
+      self.restart(key);
+    }
   }
 
   /// Restarts chats that aren't in the middle of a turn: after the API key
@@ -685,16 +781,18 @@ impl ClaudeCode {
       "model" => {
         if let (Some(chat), Some(model)) = (self.chats.get_mut(&key), text(&data, "value")) {
           chat.set_model(model);
+          remember("model", Some(model).filter(|model| *model != "default"));
         }
       }
       "mode" => {
-        if let (Some(chat), Some(mode)) = (self.chats.get_mut(&key), text(&data, "value")) {
-          chat.set_mode(mode);
+        if let Some(mode) = text(&data, "value") {
+          self.choose_mode(&key, mode);
         }
       }
       "effort" => {
         if let (Some(chat), Some(level)) = (self.chats.get_mut(&key), text(&data, "value")) {
           chat.set_effort(level);
+          remember("effort", chat.effort.as_deref());
         }
       }
       "newChat" => self.new_chat(),

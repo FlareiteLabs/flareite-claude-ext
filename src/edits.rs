@@ -17,7 +17,7 @@ use flareite_extension_api::layouts::{
   NodeKind, Pane, PaneContent, PaneDecorations, RulerMark, Zone, ZoneContent,
 };
 use flareite_extension_api::types::{Position, Range as ApiRange};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::protocol::text;
 

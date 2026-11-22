@@ -25,12 +25,15 @@ it uses your Claude Code sign-in, settings, `CLAUDE.md` files, MCP servers, and 
 - **@** mentions a file of the folder; **/** runs one of Claude Code's commands, such as
   `/compact` or `/review`.
 - **The model and mode menus** change the chat's model, and how Claude asks: **Ask before
-  edits**, **Edit automatically**, or **Plan mode** (Claude plans without editing, then asks you
-  to approve the plan).
+  edits**, **Edit automatically**, **Plan mode** (Claude plans without editing, then asks you to
+  approve the plan), **Auto mode** (Claude Code decides which actions are safe to take without
+  asking; for models that have it), or **Bypass permissions** (Claude never asks; see below).
 - **The effort menu** sets how hard Claude thinks, from **Low** to **Max**, for the rest of the
   chat; it lists the levels the chosen model takes. More effort is slower and uses more of your
   limits. **Default effort** names the level in use: the model's own, or the one in your Claude
   Code settings.
+- **The menus remember** what you chose: a new chat starts with the last mode, model, and effort
+  picked (they're saved as this extension's settings, below).
 - **Past chats** (the list button) continue an earlier conversation in this folder. **Claude
   Code: Resume a Past Chat…** opens one in a new tab. Chat tabs come back with the window and
   carry on where they left off.
@@ -42,6 +45,14 @@ Before Claude edits a file, the chat shows the edit as a diff: **Accept**, **Acc
 the file as it is beside the file as Claude would leave it, with the same buttons. Commands show
 what they'd run, with **Allow**, **Allow for This Chat**, or **Deny**. Claude's questions show
 their choices, and its plans ask for approval.
+
+To let Claude work without asking, choose **Bypass permissions** in the mode menu. The first time,
+Flareite asks you to allow it (that sets `allow_bypass_permissions`); a chat that's already
+running starts again to use it, continuing its conversation (after the current turn, if Claude is
+working). Claude then runs commands and changes files without asking. Its commands aren't
+limited to the folder: they can do anything you can on this computer. Its questions still wait for
+your answer. **Auto mode** is the middle ground: Claude Code approves what it judges safe and
+stops what it judges risky.
 
 ## Commands
 
@@ -63,7 +74,8 @@ their choices, and its plans ask for approval.
 ```toml
 [extensions.settings."flareite.claude-code"]
 model = ""                      # the model new chats start with ("sonnet", "opus"); empty for the default
-permission_mode = "default"     # default, acceptEdits, or plan
+permission_mode = "default"     # default, acceptEdits, plan, auto, or bypassPermissions
+allow_bypass_permissions = false  # whether Bypass permissions can be used
 effort = ""                     # the effort new chats start with: low, medium, high, xhigh, or max; empty for the default
 include_editor_context = true   # send the file in use and its selection by default
 open_beside = true              # open chats beside the editor
