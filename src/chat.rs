@@ -1354,6 +1354,70 @@ mod tests {
   }
 
   #[test]
+  fn the_effort_level_changes_in_the_session_and_is_read_back() {
+    let mut chat = Chat::new("1");
+    let input = chat.first_input();
+    let init: Value = serde_json::from_slice(&input).expect("JSON");
+    chat.started(1);
+    let respond = |chat: &mut Chat, id: &str, response: Value| {
+      chat.output(
+        lines(&[json!({
+          "type": "control_response",
+          "response": { "subtype": "success", "request_id": id, "response": response },
+        })]),
+        &NoFiles,
+      );
+    };
+    respond(
+      &mut chat,
+      init["request_id"].as_str().unwrap(),
+      json!({ "models": [
+        { "value": "opus", "displayName": "Opus", "supportsEffort": true, "supportedEffortLevels": ["low", "high", "max"] },
+        { "value": "old", "displayName": "Old" },
+      ] }),
+    );
+    let status = chat.status();
+    assert_eq!(
+      status["models"][0]["efforts"],
+      json!(["low", "high", "max"])
+    );
+    assert_eq!(status["models"][1]["efforts"], json!([]));
+    assert_eq!(status["effort"], "");
+
+    // Starting asks which level is in effect.
+    let asked = written(&mut chat);
+    assert_eq!(asked[0]["request"]["subtype"], "get_settings");
+    let settings = asked[0]["request_id"].as_str().unwrap().to_owned();
+    respond(
+      &mut chat,
+      &settings,
+      json!({ "applied": { "effort": "high" } }),
+    );
+    assert_eq!(chat.status()["appliedEffort"], "high");
+
+    chat.set_effort("max");
+    let changed = written(&mut chat);
+    assert_eq!(changed[0]["request"]["subtype"], "apply_flag_settings");
+    assert_eq!(changed[0]["request"]["settings"]["effortLevel"], "max");
+    assert_eq!(chat.status()["effort"], "max");
+
+    // Once it's applied, the level is read again.
+    respond(
+      &mut chat,
+      changed[0]["request_id"].as_str().unwrap(),
+      json!({}),
+    );
+    assert_eq!(written(&mut chat)[0]["request"]["subtype"], "get_settings");
+
+    // The default clears it.
+    chat.set_effort("");
+    let cleared = written(&mut chat);
+    assert!(cleared[0]["request"]["settings"]["effortLevel"].is_null());
+    assert_eq!(chat.status()["effort"], "");
+    assert_eq!(chat.effort, None);
+  }
+
+  #[test]
   fn results_end_the_turn_and_sign_in_failures_say_so() {
     let mut chat = Chat::new("1");
     chat.send("hi", Vec::new(), None);

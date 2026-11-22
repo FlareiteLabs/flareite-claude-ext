@@ -198,7 +198,7 @@ description = "How new chats start: asking before edits (default), editing witho
 type = "string"
 default = ""
 choices = ["", "low", "medium", "high", "xhigh", "max"]
-description = "How much effort Claude puts into its answers in new chats; empty for Claude Code's default."
+description = "The effort level new chats start with (the chat's effort menu changes it); empty for Claude Code's default."
 
 [configuration.include_editor_context]
 type = "boolean"

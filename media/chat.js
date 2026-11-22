@@ -356,6 +356,7 @@ function setStatus(next) {
     model.append(option)
   }
   model.value = next.model
+  setEffort(next, models)
   const mode = $('mode')
   if (![...mode.options].some(option => option.value === next.mode)) {
     const option = el('option', '', next.mode)
@@ -366,6 +367,39 @@ function setStatus(next) {
   $('busy').hidden = !next.busy
   setContext(next.context)
   updateSend()
+}
+
+const EFFORT_NAMES = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'Extra high',
+  max: 'Max',
+}
+
+function effortName(level) {
+  return EFFORT_NAMES[level] || level
+}
+
+/** The effort menu: the levels the chosen model takes, hidden if it has none. */
+function setEffort(next, models) {
+  const effort = $('effort')
+  const current = models.find(choice => choice.value === next.model) || models[0]
+  const levels = [...((current && current.efforts) || [])]
+  if (next.effort && !levels.includes(next.effort)) levels.push(next.effort)
+  effort.hidden = levels.length === 0
+  effort.replaceChildren()
+  const fallback = next.appliedEffort && !next.effort ? ` (${effortName(next.appliedEffort)})` : ''
+  const automatic = el('option', '', 'Default effort' + fallback)
+  automatic.value = ''
+  automatic.title = "The model's level, or the one in your Claude Code settings"
+  effort.append(automatic)
+  for (const level of levels) {
+    const option = el('option', '', effortName(level) + ' effort')
+    option.value = level
+    effort.append(option)
+  }
+  effort.value = next.effort || ''
 }
 
 function setContext(context) {
@@ -598,6 +632,7 @@ $('historyClose').addEventListener('click', () => ($('historyPanel').hidden = tr
 $('problems').addEventListener('click', () => send({ type: 'problems' }))
 $('model').addEventListener('change', event => send({ type: 'model', value: event.target.value }))
 $('mode').addEventListener('change', event => send({ type: 'mode', value: event.target.value }))
+$('effort').addEventListener('change', event => send({ type: 'effort', value: event.target.value }))
 contextChip.addEventListener('click', () => {
   contextEnabled = contextEnabled === false
   setContext(status.context)

@@ -350,6 +350,7 @@ impl ClaudeCode {
     let mut chat = Chat::new(key);
     chat.root = root();
     chat.api_key = matches!(secrets::get(API_KEY), Ok(Some(_)));
+    chat.effort = setting("effort");
     chat.context = self.context_status();
     chat
   }
@@ -530,7 +531,7 @@ impl ClaudeCode {
         .filter(|model| model != "default")
         .or_else(|| setting("model")),
       mode: chat.mode.clone().or_else(|| setting("permission_mode")),
-      effort: setting("effort"),
+      effort: chat.effort.clone(),
       resume: chat.session.clone(),
     };
     let mut env = Vec::new();
@@ -689,6 +690,11 @@ impl ClaudeCode {
       "mode" => {
         if let (Some(chat), Some(mode)) = (self.chats.get_mut(&key), text(&data, "value")) {
           chat.set_mode(mode);
+        }
+      }
+      "effort" => {
+        if let (Some(chat), Some(level)) = (self.chats.get_mut(&key), text(&data, "value")) {
+          chat.set_effort(level);
         }
       }
       "newChat" => self.new_chat(),

@@ -27,6 +27,10 @@ it uses your Claude Code sign-in, settings, `CLAUDE.md` files, MCP servers, and 
 - **The model and mode menus** change the chat's model, and how Claude asks: **Ask before
   edits**, **Edit automatically**, or **Plan mode** (Claude plans without editing, then asks you
   to approve the plan).
+- **The effort menu** sets how hard Claude thinks, from **Low** to **Max**, for the rest of the
+  chat; it lists the levels the chosen model takes. More effort is slower and uses more of your
+  limits. **Default effort** names the level in use: the model's own, or the one in your Claude
+  Code settings.
 - **Past chats** (the list button) continue an earlier conversation in this folder. **Claude
   Code: Resume a Past Chat…** opens one in a new tab. Chat tabs come back with the window and
   carry on where they left off.
@@ -60,7 +64,7 @@ their choices, and its plans ask for approval.
 [extensions.settings."flareite.claude-code"]
 model = ""                      # the model new chats start with ("sonnet", "opus"); empty for the default
 permission_mode = "default"     # default, acceptEdits, or plan
-effort = ""                     # low, medium, high, xhigh, or max; empty for the default
+effort = ""                     # the effort new chats start with: low, medium, high, xhigh, or max; empty for the default
 include_editor_context = true   # send the file in use and its selection by default
 open_beside = true              # open chats beside the editor
 ```
