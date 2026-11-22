@@ -6,13 +6,18 @@
 # show as diffs, in the chat and in a diff tab. See the README.
 id = "flareite.claude-code"
 name = "Claude Code"
-version = "1.0.0"
+version = "1.1.0"
 description = "Chat with Claude Code, Anthropic's coding agent, beside the editor."
 author = "Flareite"
 icon = "icon.svg"
 api_version = "2"
 entrypoint = "target/wasm32-unknown-unknown/release/claude_code.wasm"
-events = ["active-file-changed", "selection-changed", "folder-changed", "configuration-changed"]
+events = [
+  "active-file-changed",
+  "selection-changed",
+  "folder-changed",
+  "configuration-changed",
+]
 
 [engines]
 flareite = ">=0.1.0"
