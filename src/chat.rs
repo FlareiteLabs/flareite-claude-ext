@@ -778,6 +778,8 @@ impl Chat {
       "allow" | "allowSession" => {
         let mut input = pending.input.clone();
         if let Some(answers) = answers {
+          // The card keeps them, to show what was answered.
+          self.update(request, json!({ "answers": answers }));
           input["answers"] = answers;
         }
         let remember = if decision == "allowSession" {
@@ -1297,6 +1299,11 @@ mod tests {
     let input = &answer[0]["response"]["response"]["updatedInput"];
     assert_eq!(input["answers"]["Which?"], "B");
     assert_eq!(input["questions"], questions);
+    // The card keeps the answers, to show them.
+    let card = &posted_items(&mut chat)[0];
+    assert_eq!(card["state"], "allowed");
+    assert_eq!(card["answers"]["Which?"], "B");
+    assert_eq!(card["questions"], questions);
   }
 
   #[test]

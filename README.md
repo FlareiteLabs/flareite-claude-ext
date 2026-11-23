@@ -43,8 +43,10 @@ it uses your Claude Code sign-in, settings, `CLAUDE.md` files, MCP servers, and 
 Before Claude edits a file, the chat shows the edit as a diff: **Accept**, **Accept All Edits**
 (for the rest of the chat), or **Reject**, telling Claude what to do instead. **Open Diff** shows
 the file as it is beside the file as Claude would leave it, with the same buttons. Commands show
-what they'd run, with **Allow**, **Allow for This Chat**, or **Deny**. Claude's questions show
-their choices, and its plans ask for approval.
+what they'd run, with **Allow**, **Allow for This Chat**, or **Deny**. Claude's questions come
+one at a time (**Back** and **Next**, or the tabs above them), each with its choices and **Other**,
+whose text is sent only while Other is chosen; **Answer** sends them once each has an answer, and
+the card then keeps what you answered. Claude's plans ask for approval.
 
 To let Claude work without asking, choose **Bypass permissions** in the mode menu. The first time,
 Flareite asks you to allow it (that sets `allow_bypass_permissions`); a chat that's already

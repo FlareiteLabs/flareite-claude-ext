@@ -114,10 +114,13 @@ const renderers = {
       markPaths(plan)
       body.append(plan)
     }
-    let answers = null
-    if (item.questions) answers = questionsView(item.questions, body, item.state === 'pending')
+    let questions = null
+    if (item.questions) {
+      if (item.state === 'pending') questions = questionsPager(item.questions, body)
+      else body.append(answeredView(item))
+    }
     node.append(body)
-    if (item.state === 'pending') node.append(permissionButtons(item, answers))
+    if (item.state === 'pending') node.append(permissionButtons(item, questions))
     return node
   },
 
@@ -143,17 +146,30 @@ const renderers = {
   },
 }
 
-function permissionButtons(item, answers) {
+function permissionButtons(item, questions) {
   const row = el('div', 'card__buttons')
   const feedback = el('input', 'flareite-input feedback')
   feedback.placeholder = 'Tell Claude what to do instead (optional)'
   const decide = (decision, extra) => send({ type: 'permission', id: item.id, decision, ...extra })
   const deny = () => decide('deny', { message: feedback.value })
-  if (item.tool === 'AskUserQuestion') {
-    row.append(
-      button('Answer', () => decide('allow', { answers: answers() }), true),
-      button('Skip', deny),
+  if (item.tool === 'AskUserQuestion' && questions) {
+    const answer = button(
+      'Answer',
+      () => {
+        const answers = questions.answers()
+        if (answers) decide('allow', { answers })
+      },
+      true,
     )
+    const sync = () => {
+      answer.disabled = !questions.answers()
+      answer.title = answer.disabled ? 'Answer every question first' : ''
+    }
+    questions.onChange(sync, () => {
+      if (!answer.disabled) answer.click()
+    })
+    sync()
+    row.append(answer, button('Skip', deny))
   } else if (item.tool === 'ExitPlanMode') {
     row.append(
       button('Approve', () => decide('allow'), true),
@@ -234,44 +250,162 @@ function diffView(diff, pending) {
   return node
 }
 
-/** Draws questions to answer; returns a function giving the answers. */
-function questionsView(questions, container, pending) {
-  const choices = []
+/**
+ * Draws questions to answer, one page each. "Other" is a choice of its own:
+ * its text is sent only while it's chosen. Returns `answers()` (null while a
+ * question has none) and `onChange(changed, submit)`.
+ */
+function questionsPager(questions, container) {
+  const node = el('div', 'questions')
+  const tabs = el('div', 'questions__tabs')
+  tabs.setAttribute('role', 'tablist')
+  const pages = []
+  let current = 0
+  let changed = () => {}
+  let submit = () => {}
+
+  const answerOf = page => {
+    const picked = page.inputs.filter(input => input.checked).map(input => input.value)
+    if (page.other.checked && page.otherText.value.trim()) picked.push(page.otherText.value.trim())
+    return picked.length ? picked.join(', ') : null
+  }
+  const nav = el('div', 'questions__nav')
+  const back = button('Back', () => show(current - 1))
+  const next = button('Next', () => show(current + 1))
+  const count = el('span', 'muted', '')
+  nav.append(back, next, count)
+
+  const show = index => {
+    current = Math.max(0, Math.min(pages.length - 1, index))
+    pages.forEach((page, at) => {
+      page.block.hidden = at !== current
+      page.tab.setAttribute('aria-selected', String(at === current))
+      page.tab.tabIndex = at === current ? 0 : -1
+    })
+    back.disabled = current === 0
+    next.disabled = current === pages.length - 1
+    count.textContent = `${current + 1} of ${pages.length}`
+  }
+  const update = () => {
+    for (const page of pages) {
+      page.tab.classList.toggle('questions__tab--answered', Boolean(answerOf(page)))
+    }
+    changed()
+  }
+  /** After a choice: the next unanswered question, if any. */
+  const advance = () => {
+    const after = pages.findIndex((page, at) => at > current && !answerOf(page))
+    const target = after >= 0 ? after : pages.findIndex(page => !answerOf(page))
+    if (target >= 0 && target !== current) show(target)
+  }
+
   questions.forEach((question, index) => {
     const block = el('div', 'question')
+    block.setAttribute('role', 'tabpanel')
     if (question.header) block.append(el('div', 'question__header', question.header))
-    block.append(el('div', '', question.question))
+    block.append(el('div', 'question__text', question.question))
     const name = 'q' + index + '-' + Math.random().toString(36).slice(2)
+    const type = question.multiSelect ? 'checkbox' : 'radio'
     const inputs = []
     for (const option of question.options || []) {
       const label = el('label', 'option')
       const choice = el('input')
-      choice.type = question.multiSelect ? 'checkbox' : 'radio'
+      choice.type = type
       choice.name = name
       choice.value = option.label
-      choice.disabled = !pending
       const text = el('span', '', option.label)
       if (option.description) text.append(el('small', '', option.description))
       label.append(choice, text)
       block.append(label)
       inputs.push(choice)
+      choice.addEventListener('change', () => {
+        update()
+        // One choice answers a single-choice question: on to the next.
+        if (!question.multiSelect && choice.checked) setTimeout(advance, 150)
+      })
     }
-    const other = el('input', 'flareite-input feedback')
-    other.placeholder = 'Something else…'
-    other.disabled = !pending
-    block.append(other)
-    choices.push({ question: question.question, inputs, other })
-    container.append(block)
+    const otherRow = el('label', 'option option--other')
+    const other = el('input')
+    other.type = type
+    other.name = name
+    other.value = ''
+    other.setAttribute('aria-label', 'Other')
+    const otherText = el('input', 'flareite-input other')
+    otherText.placeholder = 'Other…'
+    otherRow.append(other, otherText)
+    block.append(otherRow)
+    other.addEventListener('change', () => {
+      if (other.checked) otherText.focus()
+      update()
+    })
+    // Typing chooses Other.
+    otherText.addEventListener('input', () => {
+      if (otherText.value.trim() && !other.checked) other.checked = true
+      update()
+    })
+    otherText.addEventListener('keydown', event => {
+      if (event.key !== 'Enter') return
+      event.preventDefault()
+      if (pages.every(answerOf)) submit()
+      else advance()
+    })
+
+    const tab = el('button', 'questions__tab', question.header || 'Question ' + (index + 1))
+    tab.type = 'button'
+    tab.setAttribute('role', 'tab')
+    tab.title = question.question
+    tab.addEventListener('click', () => show(index))
+    tabs.append(tab)
+    pages.push({ block, inputs, other, otherText, tab, question: question.question })
   })
-  return () => {
-    const answers = {}
-    for (const { question, inputs, other } of choices) {
-      const picked = inputs.filter(input => input.checked).map(input => input.value)
-      if (other.value.trim()) picked.push(other.value.trim())
-      if (picked.length) answers[question] = picked.join(', ')
-    }
-    return answers
+
+  tabs.addEventListener('keydown', event => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+    event.preventDefault()
+    show(current + (event.key === 'ArrowRight' ? 1 : -1))
+    pages[current].tab.focus()
+  })
+
+  if (pages.length > 1) node.append(tabs)
+  for (const page of pages) node.append(page.block)
+  if (pages.length > 1) node.append(nav)
+  container.append(node)
+  show(0)
+  update()
+
+  return {
+    answers() {
+      const answers = {}
+      for (const page of pages) {
+        const answer = answerOf(page)
+        if (!answer) return null
+        answers[page.question] = answer
+      }
+      return answers
+    },
+    onChange(onChanged, onSubmit) {
+      changed = onChanged
+      submit = onSubmit
+    },
   }
+}
+
+/** A decided question card: each question with the answer given. */
+function answeredView(item) {
+  const node = el('div', 'questions questions--answered')
+  const answers = item.answers || {}
+  for (const question of item.questions) {
+    const block = el('div', 'question')
+    if (question.header) block.append(el('div', 'question__header', question.header))
+    block.append(el('div', 'question__text', question.question))
+    const answer = answers[question.question]
+    if (answer) block.append(el('div', 'answer', answer))
+    else if (item.state !== 'allowed') {
+      block.append(el('div', 'answer answer--none', 'Not answered'))
+    }
+    node.append(block)
+  }
+  return node
 }
 
 /** Inline code naming a file (`src/main.rs:12`) opens it when clicked. */
